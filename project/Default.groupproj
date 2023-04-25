@@ -6,7 +6,22 @@
         <Projects Include="dbx4fb.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="..\delphi-int128\Int128p.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\delphi-firebird-api\project\DFirebirdAPI.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="dbx4fbrt.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\delphi-detours-library\Package\Detours.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DBXFirebirdDriverPatch.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="dbxfbTests.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -26,6 +41,24 @@
     <Target Name="dbx4fb:Make">
         <MSBuild Projects="dbx4fb.dproj" Targets="Make"/>
     </Target>
+    <Target Name="Int128p">
+        <MSBuild Projects="..\delphi-int128\Int128p.dproj"/>
+    </Target>
+    <Target Name="Int128p:Clean">
+        <MSBuild Projects="..\delphi-int128\Int128p.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Int128p:Make">
+        <MSBuild Projects="..\delphi-int128\Int128p.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="DFirebirdAPI">
+        <MSBuild Projects="..\delphi-firebird-api\project\DFirebirdAPI.dproj"/>
+    </Target>
+    <Target Name="DFirebirdAPI:Clean">
+        <MSBuild Projects="..\delphi-firebird-api\project\DFirebirdAPI.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DFirebirdAPI:Make">
+        <MSBuild Projects="..\delphi-firebird-api\project\DFirebirdAPI.dproj" Targets="Make"/>
+    </Target>
     <Target Name="dbx4fbrt">
         <MSBuild Projects="dbx4fbrt.dproj"/>
     </Target>
@@ -35,14 +68,41 @@
     <Target Name="dbx4fbrt:Make">
         <MSBuild Projects="dbx4fbrt.dproj" Targets="Make"/>
     </Target>
+    <Target Name="Detours">
+        <MSBuild Projects="..\delphi-detours-library\Package\Detours.dproj"/>
+    </Target>
+    <Target Name="Detours:Clean">
+        <MSBuild Projects="..\delphi-detours-library\Package\Detours.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Detours:Make">
+        <MSBuild Projects="..\delphi-detours-library\Package\Detours.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="DBXFirebirdDriverPatch">
+        <MSBuild Projects="DBXFirebirdDriverPatch.dproj"/>
+    </Target>
+    <Target Name="DBXFirebirdDriverPatch:Clean">
+        <MSBuild Projects="DBXFirebirdDriverPatch.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DBXFirebirdDriverPatch:Make">
+        <MSBuild Projects="DBXFirebirdDriverPatch.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="dbxfbTests">
+        <MSBuild Projects="dbxfbTests.dproj"/>
+    </Target>
+    <Target Name="dbxfbTests:Clean">
+        <MSBuild Projects="dbxfbTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="dbxfbTests:Make">
+        <MSBuild Projects="dbxfbTests.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="dbx4fb;dbx4fbrt"/>
+        <CallTarget Targets="dbx4fb;Int128p;DFirebirdAPI;dbx4fbrt;Detours;DBXFirebirdDriverPatch;dbxfbTests"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="dbx4fb:Clean;dbx4fbrt:Clean"/>
+        <CallTarget Targets="dbx4fb:Clean;Int128p:Clean;DFirebirdAPI:Clean;dbx4fbrt:Clean;Detours:Clean;DBXFirebirdDriverPatch:Clean;dbxfbTests:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="dbx4fb:Make;dbx4fbrt:Make"/>
+        <CallTarget Targets="dbx4fb:Make;Int128p:Make;DFirebirdAPI:Make;dbx4fbrt:Make;Detours:Make;DBXFirebirdDriverPatch:Make;dbxfbTests:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

@@ -28,10 +28,14 @@ type
         TDBXErrorCode; overload;
     function GetInt64(Ordinal: TInt32; out Value: PInt64; out IsNull: LongBool):
         TDBXErrorCode; overload;
+    function GetSingle(Ordinal: TInt32; out Value: PSingle; out IsNull: LongBool):
+        TDBXErrorCode; overload;
     function GetTime(Ordinal: TInt32; Value: PInteger; out IsNull: LongBool):
         TDBXErrorCode; overload;
     function GetTimeStamp(Ordinal: TInt32; out Value: PSQLTimeStamp; out IsNull:
         LongBool): TDBXErrorCode; overload;
+    function GetTimeStampOffset(Ordinal: TInt32; out Value: PSQLTimeStampOffset; out
+        IsNull: LongBool): TDBXErrorCode; overload;
     function Get_oVar(const Ordinal: TInt32): TXSQLVAR;
   protected  // IDBXRow
     function GetAnsiString(Ordinal: TInt32; Value: TDBXAnsiStringBuilder; out
@@ -61,8 +65,11 @@ type
         TDBXErrorCode; overload;
     function GetTimeStamp(Ordinal: TInt32; out Value: TSQLTimeStamp; out IsNull:
         LongBool): TDBXErrorCode; overload;
+    function GetTimeStampOffset(Ordinal: TInt32; out Value: TSQLTimeStampOffset; out IsNull:
+        LongBool): TDBXErrorCode; overload;
     function GetWideString(Ordinal: TInt32; Value: TDBXWideStringBuilder; out
         IsNull: LongBool): TDBXErrorCode;
+    procedure SetDSQL(const aSQL: IFirebird_DSQL; const aMetaData: IMetaDataProvider);
   protected // IDBXWritableRow
     function SetAnsiString(Ordinal: TInt32; const Value: TDBXAnsiString; Length:
         Int64): TDBXErrorCode;
@@ -84,6 +91,7 @@ type
     function SetSingle(Ordinal: TInt32; Value: Single): TDBXErrorCode;
     function SetTime(Ordinal: TInt32; Value: TDBXTime): TDBXErrorCode;
     function SetTimeStamp(Ordinal: TInt32; var Value: TSQLTimeStamp): TDBXErrorCode;
+    function SetTimeStampOffset(Ordinal: TInt32; var Value: TSQLTimeStampOffset): TDBXErrorCode;
     function SetWideString(Ordinal: TInt32; const Value: TDBXWideString; Length:
         Int64): TDBXErrorCode;
   protected
@@ -250,8 +258,10 @@ begin
     TDBXDataTypes.Int32Type:      Result := GetInt32(Ordinal, PLongint(Value), IsNull);
     TDBXDataTypes.Int64Type:      Result := GetInt64(Ordinal, PInt64(Value), IsNull);
     TDBXDataTypes.TimeStampType:  Result := GetTimeStamp(Ordinal, PSQLTimeStamp(Value), IsNull);
+    TDBXDataTypes.TimeStampOffsetType: Result := GetTimeStampOffset(Ordinal, PSQLTimeStampOffset(Value), IsNull);
     TDBXDataTypes.TimeType:       Result := GetTime(Ordinal, PInteger(Value), IsNull);
     TDBXDataTypes.DoubleType:     Result := GetDouble(Ordinal, PDouble(Value), IsNull);
+    TDBXDataTypes.SingleType:     Result := GetSingle(Ordinal, PSingle(Value), IsNull);
     else
       Result := NotSupported;
   end;
@@ -299,6 +309,15 @@ begin
   Result := GetInt64(Ordinal, p, IsNull);
 end;
 
+function TDBXRow_Firebird.GetSingle(Ordinal: TInt32; out Value: PSingle;
+  out IsNull: LongBool): TDBXErrorCode;
+var B: Boolean;
+begin
+  Get_oVar(Ordinal).GetSingle(Value, B);
+  IsNull := B;
+  Result := TDBXErrorCodes.None;
+end;
+
 function TDBXRow_Firebird.GetInt64(Ordinal: TInt32; out Value: PInt64;
   out IsNull: LongBool): TDBXErrorCode;
 var B: Boolean;
@@ -333,11 +352,28 @@ begin
   Result := GetTimeStamp(Ordinal, p, IsNull);
 end;
 
+function TDBXRow_Firebird.GetTimeStampOffset(Ordinal: TInt32;
+  out Value: TSQLTimeStampOffset; out IsNull: LongBool): TDBXErrorCode;
+var p: PSQLTimeStampOffset;
+begin
+  p := @Value;
+  Result := GetTimeStampOffset(Ordinal, p, IsNull);
+end;
+
 function TDBXRow_Firebird.GetTimeStamp(Ordinal: TInt32; out Value:
     PSQLTimeStamp; out IsNull: LongBool): TDBXErrorCode;
 var B: Boolean;
 begin
   Get_oVar(Ordinal).GetTimeStamp(Value, B);
+  IsNull := B;
+  Result := TDBXErrorCodes.None;
+end;
+
+function TDBXRow_Firebird.GetTimeStampOffset(Ordinal: TInt32; out Value:
+    PSQLTimeStampOffset; out IsNull: LongBool): TDBXErrorCode;
+var B: Boolean;
+begin
+  Get_oVar(Ordinal).GetTimeStampOffset(Value, B);
   IsNull := B;
   Result := TDBXErrorCodes.None;
 end;
@@ -421,6 +457,16 @@ begin
   Result := TDBXErrorCodes.None;
 end;
 
+procedure TDBXRow_Firebird.SetDSQL(const aSQL: IFirebird_DSQL;
+  const aMetaData: IMetaDataProvider);
+begin
+  Assert(FDSQL = nil);
+  Assert(FMetaData = nil);
+
+  FDSQL := aSQL;
+  FMetaData := aMetaData;
+end;
+
 function TDBXRow_Firebird.SetInt16(Ordinal: TInt32; Value: SmallInt): TDBXErrorCode;
 begin
   FDSQL.i_SQLDA[Ordinal].SetShort(@Value, SizeOf(Value), False);
@@ -464,7 +510,7 @@ end;
 function TDBXRow_Firebird.SetSingle(Ordinal: TInt32;
   Value: Single): TDBXErrorCode;
 begin
-  FDSQL.i_SQLDA[Ordinal].SetInteger(@Value, SizeOf(Value), False);
+  FDSQL.i_SQLDA[Ordinal].SetSingle(@Value, SizeOf(Value), False);
   Result := TDBXErrorCodes.None;
 end;
 
@@ -478,6 +524,13 @@ function TDBXRow_Firebird.SetTimeStamp(Ordinal: TInt32;
   var Value: TSQLTimeStamp): TDBXErrorCode;
 begin
   FDSQL.i_SQLDA[Ordinal].SetTimeStamp(@Value, False);
+  Result := TDBXErrorCodes.None;
+end;
+
+function TDBXRow_Firebird.SetTimeStampOffset(Ordinal: TInt32;
+  var Value: TSQLTimeStampOffset): TDBXErrorCode;
+begin
+  FDSQL.i_SQLDA[Ordinal].SetTimeStampOffset(@Value, False);
   Result := TDBXErrorCodes.None;
 end;
 

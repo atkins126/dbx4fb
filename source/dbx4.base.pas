@@ -4,10 +4,21 @@ interface
 
 uses
   System.SysUtils, Data.DBXCommon, Data.DBXDynalink, Data.DBXPlatform,
-  Data.FmtBcd, Data.SqlTimSt;
+  Data.FmtBcd, Data.SqlTimSt, firebird.dsql;
 
 type
   TRawByteStringArray = array of RawByteString;
+
+  IMetaDataProvider = interface
+    function GetColumnCount: TInt32;
+    function GetColumnLength(const aColNo: TInt32): LongWord;
+    function GetColumnName(const aColNo: TInt32): WideString;
+    function GetColumnPrecision(const aColNo: TInt32): TInt32;
+    function GetColumnScale(const aColNo: TInt32): TInt32;
+    function GetColumnType(const aColNo: TInt32): TInt32;
+    function GetColumnSubType(const aColNo: TInt32): TInt32;
+    function GetIsNullable(const aColNo: TInt32): boolean;
+  end;
 
   IDBXBase = interface(IInterface)
   ['{671ED8A1-C1CC-46CC-AFD6-62DE69695235}']
@@ -39,6 +50,8 @@ type
     function Commit(TransactionHandle: TDBXTransactionHandle): TDBXErrorCode;
     function Connect(Count: TInt32; Names, Values: TWideStringArray): TDBXErrorCode;
     function GetIsDelphi2007Connection: boolean;
+    function GetVendorProperty(Name: TDBXWideString; Value: TDBXWideStringBuilder;
+        MaxLength: Longint): TDBXErrorCode;
     function IsolationLevel: TInt32;
     function Rollback(TransactionHandle: TDBXTransactionHandle): TDBXErrorCode;
     function SetCallbackEvent(CallbackHandle: DBXCallbackHandle; CallbackEvent:
@@ -74,8 +87,11 @@ type
         TDBXErrorCode;
     function GetTimeStamp(Ordinal: TInt32; out Value: TSQLTimeStamp; out IsNull:
         LongBool): TDBXErrorCode;
+    function GetTimeStampOffset(Ordinal: TInt32; out Value: TSQLTimeStampOffset; out IsNull:
+        LongBool): TDBXErrorCode;
     function GetWideString(Ordinal: TInt32; Value: TDBXWideStringBuilder; out
         IsNull: LongBool): TDBXErrorCode;
+    procedure SetDSQL(const aSQL: IFirebird_DSQL; const aMetaData: IMetaDataProvider);
   end;
 
   IDBXWritableRow = interface(IDBXBase)
@@ -100,6 +116,7 @@ type
     function SetSingle(Ordinal: TInt32; Value: Single): TDBXErrorCode;
     function SetTime(Ordinal: TInt32; Value: TDBXTime): TDBXErrorCode;
     function SetTimeStamp(Ordinal: TInt32; var Value: TSQLTimeStamp): TDBXErrorCode;
+    function SetTimeStampOffset(Ordinal: TInt32; var Value: TSQLTimeStampOffset): TDBXErrorCode;
     function SetWideString(Ordinal: TInt32; const Value: TDBXWideString; Length:
         Int64): TDBXErrorCode;
   end;
@@ -117,21 +134,8 @@ type
   ['{D509CC08-86E0-459E-8C08-E5E1346C7590}']
     function CreateParameterRow(out aRow: TDBXRowHandle): TDBXErrorCode;
     function Execute(out Reader: IDBXReader): TDBXErrorCode;
-    function ExecuteImmediate(const SQL: TDBXWideString; out aReader: IDBXReader):
-        TDBXErrorCode;
     function GetRowsAffected(out Rows: Int64): TDBXErrorCode;
     function Prepare(const SQL: TDBXWideString; Count: TInt32): TDBXErrorCode;
-  end;
-
-  IMetaDataProvider = interface
-    function GetColumnCount: TInt32;
-    function GetColumnLength(const aColNo: TInt32): LongWord;
-    function GetColumnName(const aColNo: TInt32): WideString;
-    function GetColumnPrecision(const aColNo: TInt32): TInt32;
-    function GetColumnScale(const aColNo: TInt32): TInt32;
-    function GetColumnType(const aColNo: TInt32): TInt32;
-    function GetColumnSubType(const aColNo: TInt32): TInt32;
-    function GetIsNullable(const aColNo: TInt32): boolean;
   end;
 
 implementation
