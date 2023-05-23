@@ -3,10 +3,10 @@ unit dbx4.firebird.connection;
 interface
 
 uses
-  System.SysUtils, Data.DBXCommon, Data.DBXDynalink, Data.DBXPlatform,
+  System.Generics.Collections, System.SysUtils, Data.DBXCommon, Data.DBXDynalink,
+  Data.DBXPlatform,
   dbx4.base, dbx4.firebird.base, firebird.client, firebird.consts_pub.h,
-  firebird.ibase.h, firebird.types_pub.h,
-  firebird.delphi;
+  firebird.delphi, firebird.ibase.h, firebird.types_pub.h;
 
 type
   TFirebirdClientDebuggerListener_DBXCallBack = class(TInterfacedObject, IFirebirdLibraryDebuggerListener)
@@ -39,6 +39,7 @@ type
     FWaitOnLocks: Boolean;
     FWaitOnLocksTimeOut: Integer;
     FProviders: string;
+    FTimeZones: TDictionary<Word, TTimeZoneOffset>;
     procedure SetupTimeZones(AddTimeZone: TAddTimeZone);
   protected
     function BeginTransaction(out TransactionHandle: TDBXTransactionHandle;
@@ -52,6 +53,7 @@ type
     function GetIsDelphi2007Connection: boolean;
     function GetServerCharSet: WideString;
     function GetSQLDialect: integer;
+    function GetTimeZoneOffset(aFBTimeZoneID: Word): TTimeZoneOffset;
     function GetTransactionPool: TFirebirdTransactionPool;
     function GetTrimChar: Boolean;
     function GetVendorProperty(Name: TDBXWideString; Value: TDBXWideStringBuilder;
@@ -63,6 +65,7 @@ type
         DBXTraceCallback): TDBXErrorCode;
   public
     constructor Create(const aDriver: IDBXDriver);
+    procedure BeforeDestruction; override;
   end;
 
 implementation
@@ -75,6 +78,12 @@ constructor TDBXConnection_Firebird.Create(const aDriver: IDBXDriver);
 begin
   inherited Create;
   FFirebirdLibrary := (aDriver as IDBXDriver_Firebird).GetLibrary;
+end;
+
+procedure TDBXConnection_Firebird.BeforeDestruction;
+begin
+  FreeAndNil(FTimeZones);
+  inherited;
 end;
 
 function TDBXConnection_Firebird.BeginTransaction(
@@ -104,8 +113,7 @@ begin
     Exit;
   end;
 
-  N.Start(StatusVector);
-  if not StatusVector.CheckResult(Result, TDBXErrorCodes.VendorError) then Exit;
+  if not CheckSuccess(N.Start(StatusVector), TDBXErrorCodes.VendorError, Result) then Exit(Result);
 
   TransactionHandle := nil;
   TFirebirdTransaction(TransactionHandle) := N;
@@ -115,20 +123,17 @@ end;
 function TDBXConnection_Firebird.Close: TDBXErrorCode;
 begin
   FreeAndNil(FTransactionPool);
-  if FDBHandle <> nil then begin
-    FFirebirdLibrary.isc_detach_database(StatusVector.pValue, GetDBHandle);
-    StatusVector.CheckResult(Result, TDBXErrorCodes.ConnectionFailed);
-  end else
+  if Assigned(FDBHandle) then
+    Result := CheckSuccess(FFirebirdLibrary.isc_detach_database(StatusVector.pValue, GetDBHandle), TDBXErrorCodes.ConnectionFailed)
+  else
     Result := TDBXErrorCodes.None;
-
-  FFirebirdLibrary.SetupTimeZoneHandler(nil);
+  FreeAndNil(FTimeZones);
 end;
 
 function TDBXConnection_Firebird.Commit(
   TransactionHandle: TDBXTransactionHandle): TDBXErrorCode;
 begin
-  FTransactionPool.Commit(StatusVector, TFirebirdTransaction(TransactionHandle));
-  StatusVector.CheckResult(Result, TDBXErrorCodes.VendorError);
+  Result := CheckSuccess(FTransactionPool.Commit(StatusVector, TFirebirdTransaction(TransactionHandle)), TDBXErrorCodes.VendorError);
 end;
 
 function TDBXConnection_Firebird.Connect(Count: TInt32; Names, Values:
@@ -181,7 +186,7 @@ begin
       if not TryStrToBool(Values[i], FIsDelphi2007Connection) then
         FIsDelphi2007Connection := False;
     end else if SameText(Names[i], TFirebird.FB_Config_Providers) then
-      FProviders := TFirebird.FB_Config_Providers + '=' + Values[i];
+      FProviders := Values[i];
   end;
 
   DPB := AnsiChar(isc_dpb_version1) +
@@ -198,8 +203,8 @@ begin
     sServerName := AnsiString(FHostName) + ':' + AnsiString(sServerName);
 
   FDBHandle := nil;
-  FFirebirdLibrary.isc_attach_database(StatusVector.pValue, Length(sServerName), PISC_SCHAR(sServerName), GetDBHandle, Length(DPB), PISC_SCHAR(DPB));
-  StatusVector.CheckResult(Result, TDBXErrorCodes.ConnectionFailed);
+  if not CheckSuccess(FFirebirdLibrary.isc_attach_database(StatusVector.pValue, Length(sServerName), PISC_SCHAR(sServerName), GetDBHandle, Length(DPB), PISC_SCHAR(DPB)), TDBXErrorCodes.ConnectionFailed, Result) then
+    Exit(Result);
 
   Assert(FTransactionPool = nil);
   T.Init;
@@ -211,8 +216,6 @@ begin
   T.WaitOnLocks := FWaitOnLocks;
   T.WaitOnLocksTimeOut := FWaitOnLocksTimeOut;
   FTransactionPool := TFirebirdTransactionPool.Create(FFirebirdLibrary, GetDBHandle, T);
-
-  FFirebirdLibrary.SetupTimeZoneHandler(SetupTimeZones);
 end;
 
 function TDBXConnection_Firebird.GetDBHandle: pisc_db_handle;
@@ -238,6 +241,17 @@ end;
 function TDBXConnection_Firebird.GetSQLDialect: integer;
 begin
   Result := FSQLDialect;
+end;
+
+function TDBXConnection_Firebird.GetTimeZoneOffset(
+  aFBTimeZoneID: Word): TTimeZoneOffset;
+begin
+  if FTimeZones = nil then begin
+    FTimeZones := TDictionary<Word, TTimeZoneOffset>.Create;
+    SetupTimeZones(FTimeZones.Add);
+  end;
+  if not FTimeZones.TryGetValue(aFBTimeZoneID, Result) then
+    Result := TTimeZoneOffset.Default;
 end;
 
 function TDBXConnection_Firebird.GetTransactionPool: TFirebirdTransactionPool;
@@ -282,8 +296,7 @@ end;
 function TDBXConnection_Firebird.Rollback(
   TransactionHandle: TDBXTransactionHandle): TDBXErrorCode;
 begin
-  FTransactionPool.RollBack(StatusVector, TFirebirdTransaction(TransactionHandle));
-  StatusVector.CheckResult(Result, TDBXErrorCodes.VendorError);
+  Result := CheckSuccess(FTransactionPool.RollBack(StatusVector, TFirebirdTransaction(TransactionHandle)), TDBXErrorCodes.VendorError);
 end;
 
 function TDBXConnection_Firebird.SetCallbackEvent(CallbackHandle:

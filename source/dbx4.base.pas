@@ -4,7 +4,8 @@ interface
 
 uses
   System.SysUtils, Data.DBXCommon, Data.DBXDynalink, Data.DBXPlatform,
-  Data.FmtBcd, Data.SqlTimSt, firebird.dsql;
+  Data.FMTBcd, Data.SqlTimSt, firebird.types_pub.h, firebird.iberror.h,
+  firebird.delphi, firebird.dsql;
 
 type
   TRawByteStringArray = array of RawByteString;
@@ -31,6 +32,10 @@ type
 
   TDBXBase = class abstract(TInterfacedObject, IDBXBase)
   protected
+    function CheckSuccess(aFBStatus: ISC_STATUS; aMapDBXError: TDBXErrorCode):
+        TDBXErrorCode; overload;
+    function CheckSuccess(aFBStatus: ISC_STATUS; aMapDBXError: TDBXErrorCode; out
+        aDBXError: TDBXErrorCode): Boolean; overload;
     function Close: TDBXErrorCode; virtual; abstract;
     function GetErrorMessage(LastErrorCode: TDBXErrorCode; ErrorMessage:
         TDBXWideStringBuilder): TDBXErrorCode; virtual; abstract;
@@ -50,6 +55,7 @@ type
     function Commit(TransactionHandle: TDBXTransactionHandle): TDBXErrorCode;
     function Connect(Count: TInt32; Names, Values: TWideStringArray): TDBXErrorCode;
     function GetIsDelphi2007Connection: boolean;
+    function GetTimeZoneOffset(aFBTimeZoneID: Word): TTimeZoneOffset;
     function GetVendorProperty(Name: TDBXWideString; Value: TDBXWideStringBuilder;
         MaxLength: Longint): TDBXErrorCode;
     function IsolationLevel: TInt32;
@@ -139,5 +145,26 @@ type
   end;
 
 implementation
+
+function TDBXBase.CheckSuccess(aFBStatus: ISC_STATUS; aMapDBXError:
+    TDBXErrorCode; out aDBXError: TDBXErrorCode): Boolean;
+begin
+  if aFBStatus = isc_arg_end then begin
+    aDBXError := TDBXErrorCodes.None;
+    Result := True;
+  end else begin
+    aDBXError := aMapDBXError;
+    Result := False;
+  end;
+end;
+
+function TDBXBase.CheckSuccess(aFBStatus: ISC_STATUS; aMapDBXError:
+    TDBXErrorCode): TDBXErrorCode;
+begin
+  if aFBStatus = isc_arg_end then
+    Result := TDBXErrorCodes.None
+  else
+    Result := aMapDBXError;
+end;
 
 end.
